@@ -72,6 +72,9 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
     private volatile CountDownLatch mLatchForWaitingLoadingMainDictionaries = new CountDownLatch(0);
     // To synchronize assigning mDictionaryGroup to ensure closing dictionaries.
     private final Object mLock = new Object();
+    // Whether mDictionaryGroup was set up while the personal dictionaries could not be used,
+    // before the user unlocked the device, and so lacks them.
+    private volatile boolean mIsSetUpWithoutPersonalDicts = false;
 
     public static final Map<String, Class<? extends ExpandableBinaryDictionary>>
             DICT_TYPE_TO_CLASS = new HashMap<>();
@@ -299,6 +302,14 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         if (usePersonalizedDicts) {
             subDictTypesToUse.add(Dictionary.TYPE_USER_HISTORY);
         }
+        // The user dictionary, contact names and learned words are kept only in
+        // credential-protected storage (see PersonalDictionaryStorage), so until the user unlocks
+        // the device only the main dictionary is used.
+        PersonalDictionaryStorage.deleteDeviceProtectedCopies(context);
+        final boolean canUsePersonalDicts = PersonalDictionaryStorage.isAvailable(context);
+        if (!canUsePersonalDicts) {
+            subDictTypesToUse.clear();
+        }
 
         // Gather all dictionaries. We'll remove them from the list to clean up later.
         final ArrayList<String> dictTypeForLocale = new ArrayList<>();
@@ -354,6 +365,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         synchronized (mLock) {
             oldDictionaryGroup = mDictionaryGroup;
             mDictionaryGroup = newDictionaryGroup;
+            mIsSetUpWithoutPersonalDicts = !canUsePersonalDicts;
             if (hasAtLeastOneUninitializedMainDictionary()) {
                 asyncReloadUninitializedMainDictionaries(context, newLocale, listener);
             }
@@ -372,10 +384,21 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
                 dictionarySetToCleanup.closeDict(dictType);
             }
         }
+        // Contact names are not kept once they are not used, for example after contact
+        // suggestions are turned off or READ_CONTACTS is revoked. This is queued after closing
+        // the contacts dictionary above.
+        if (canUsePersonalDicts && !subDictTypesToUse.contains(Dictionary.TYPE_CONTACTS)) {
+            PersonalDictionaryStorage.deleteContactsDictionaries(context, dictNamePrefix);
+        }
 
         if (mValidSpellingWordWriteCache != null) {
             mValidSpellingWordWriteCache.evictAll();
         }
+    }
+
+    @Override
+    public boolean needsResetAfterUserUnlock(final Context context) {
+        return mIsSetUpWithoutPersonalDicts && PersonalDictionaryStorage.isAvailable(context);
     }
 
     private void asyncReloadUninitializedMainDictionaries(final Context context,
@@ -446,6 +469,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
             }
         }
         mDictionaryGroup = new DictionaryGroup(locale, mainDictionary, account, subDicts);
+        mIsSetUpWithoutPersonalDicts = false;
     }
 
     public void closeDictionaries() {
@@ -453,6 +477,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         synchronized (mLock) {
             dictionaryGroupToClose = mDictionaryGroup;
             mDictionaryGroup = new DictionaryGroup();
+            mIsSetUpWithoutPersonalDicts = false;
         }
         for (final String dictType : ALL_DICTIONARY_TYPES) {
             dictionaryGroupToClose.closeDict(dictType);
@@ -624,6 +649,12 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         final float[] weightOfLangModelVsSpatialModel =
                 new float[] { Dictionary.NOT_A_WEIGHT_OF_LANG_MODEL_VS_SPATIAL_MODEL };
         for (final String dictType : ALL_DICTIONARY_TYPES) {
+            // Learned words are not suggested in fields that ask for no personalized learning,
+            // such as incognito tabs and password fields.
+            if (Dictionary.TYPE_USER_HISTORY.equals(dictType)
+                    && !settingsValuesForSuggestion.mUseLearnedWords) {
+                continue;
+            }
             final Dictionary dictionary = mDictionaryGroup.getDict(dictType);
             if (null == dictionary) continue;
             final float weightForLocale = composedData.mIsBatchMode

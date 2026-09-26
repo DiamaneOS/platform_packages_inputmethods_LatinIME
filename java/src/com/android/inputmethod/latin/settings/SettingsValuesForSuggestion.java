@@ -18,8 +18,17 @@ package com.android.inputmethod.latin.settings;
 
 public class SettingsValuesForSuggestion {
     public final boolean mBlockPotentiallyOffensive;
+    // Whether learned words (the user history dictionary) may be suggested. They are not in
+    // fields that ask for no personalized learning, such as incognito tabs and password fields.
+    public final boolean mUseLearnedWords;
 
     public SettingsValuesForSuggestion(final boolean blockPotentiallyOffensive) {
+        this(blockPotentiallyOffensive, true /* useLearnedWords */);
+    }
+
+    public SettingsValuesForSuggestion(final boolean blockPotentiallyOffensive,
+            final boolean useLearnedWords) {
         mBlockPotentiallyOffensive = blockPotentiallyOffensive;
+        mUseLearnedWords = useLearnedWords;
     }
 }

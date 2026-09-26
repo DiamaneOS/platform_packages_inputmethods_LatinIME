@@ -91,6 +91,14 @@ public final class SystemBroadcastReceiver extends BroadcastReceiver {
             KeyboardLayoutSet.onSystemLocaleChanged();
         }
 
+        // Personal dictionaries that earlier builds kept in device-protected storage are deleted
+        // here too, before the process can be killed below, so that they are not left readable
+        // before the first unlock when this is not the current keyboard.
+        if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(intentAction)
+                || Intent.ACTION_BOOT_COMPLETED.equals(intentAction)) {
+            PersonalDictionaryStorage.deleteDeviceProtectedCopiesNow(context);
+        }
+
         // The process that hosts this broadcast receiver is invoked and remains alive even after
         // 1) the package has been re-installed,
         // 2) the device has just booted,
