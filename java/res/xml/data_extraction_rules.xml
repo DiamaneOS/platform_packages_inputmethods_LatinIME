@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0
+     Copyright 2026 The DiamaneOS Project -->
+<!-- Nothing is backed up or copied to a new device. android:allowBackup="false" covers this for
+     this system app; these rules repeat it for any path that reads data extraction rules
+     instead (target SDK 31 or later). -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="."/>
+        <exclude domain="file" path="."/>
+        <exclude domain="database" path="."/>
+        <exclude domain="sharedpref" path="."/>
+        <exclude domain="external" path="."/>
+        <exclude domain="device_root" path="."/>
+        <exclude domain="device_file" path="."/>
+        <exclude domain="device_database" path="."/>
+        <exclude domain="device_sharedpref" path="."/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="."/>
+        <exclude domain="file" path="."/>
+        <exclude domain="database" path="."/>
+        <exclude domain="sharedpref" path="."/>
+        <exclude domain="external" path="."/>
+        <exclude domain="device_root" path="."/>
+        <exclude domain="device_file" path="."/>
+        <exclude domain="device_database" path="."/>
+        <exclude domain="device_sharedpref" path="."/>
+    </device-transfer>
+</data-extraction-rules>

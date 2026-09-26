@@ -224,9 +224,19 @@ public final class DictionarySettingsFragment extends PreferenceFragment
     public void updateCycleCompleted() {}
 
     void refreshNetworkState() {
-        NetworkInfo info = mConnectivityManager.getActiveNetworkInfo();
-        boolean isConnected = null == info ? false : info.isConnected();
-        if (null != mUpdateNowMenu) mUpdateNowMenu.setEnabled(isConnected);
+        // Only the "check for updates" menu item uses the network state, and it only exists when
+        // there is a metadata URI to update from. The query needs ACCESS_NETWORK_STATE, which
+        // this app does not hold, so it is only made for that item and a refusal counts as not
+        // connected.
+        if (null == mUpdateNowMenu) return;
+        boolean isConnected = false;
+        try {
+            NetworkInfo info = mConnectivityManager.getActiveNetworkInfo();
+            isConnected = null == info ? false : info.isConnected();
+        } catch (final SecurityException e) {
+            isConnected = false;
+        }
+        mUpdateNowMenu.setEnabled(isConnected);
     }
 
     void refreshInterface() {
