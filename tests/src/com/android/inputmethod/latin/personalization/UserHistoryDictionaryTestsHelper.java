@@ -21,6 +21,7 @@ import android.content.Context;
 import com.android.inputmethod.latin.BinaryDictionary;
 import com.android.inputmethod.latin.NgramContext;
 import com.android.inputmethod.latin.NgramContext.WordInfo;
+import com.android.inputmethod.latin.PersonalDictionaryStorage;
 import com.android.inputmethod.latin.common.FileUtils;
 
 import java.io.File;
@@ -59,7 +60,11 @@ public class UserHistoryDictionaryTestsHelper {
                 return filename.startsWith(UserHistoryDictionary.NAME + "." + filter);
             }
         };
-        FileUtils.deleteFilteredFiles(context.getFilesDir(), filenameFilter);
+        // User history dictionaries are kept in credential-protected storage.
+        final File filesDir = PersonalDictionaryStorage.getFilesDir(context);
+        if (filesDir != null) {
+            FileUtils.deleteFilteredFiles(filesDir, filenameFilter);
+        }
     }
 
     /**

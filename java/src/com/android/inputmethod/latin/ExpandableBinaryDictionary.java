@@ -23,6 +23,7 @@ import com.android.inputmethod.annotations.UsedForTesting;
 import com.android.inputmethod.latin.SuggestedWords.SuggestedWordInfo;
 import com.android.inputmethod.latin.common.ComposedData;
 import com.android.inputmethod.latin.common.FileUtils;
+import com.android.inputmethod.latin.define.DebugFlags;
 import com.android.inputmethod.latin.define.DecoderSpecificConstants;
 import com.android.inputmethod.latin.makedict.DictionaryHeader;
 import com.android.inputmethod.latin.makedict.FormatSpec;
@@ -153,8 +154,18 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
 
     public static File getDictFile(final Context context, final String dictName,
             final File dictFile) {
-        return (dictFile != null) ? dictFile
-                : new File(context.getFilesDir(), dictName + DICT_FILE_EXTENSION);
+        if (dictFile != null) {
+            return dictFile;
+        }
+        // These dictionaries hold personal words, so by default they are kept in
+        // credential-protected storage even though the app defaults to device-protected storage.
+        // There is no fallback to the default storage: before the user unlocks the device, or
+        // without credential-protected storage, this throws.
+        final File dir = PersonalDictionaryStorage.getFilesDir(context);
+        if (dir == null) {
+            throw new IllegalStateException("No credential-protected storage for " + dictName);
+        }
+        return new File(dir, dictName + DICT_FILE_EXTENSION);
     }
 
     public static String getDictName(final String name, final Locale locale,
@@ -306,10 +317,9 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
 
     protected void addUnigramLocked(final String word, final int frequency,
             final boolean isNotAWord, final boolean isPossiblyOffensive, final int timestamp) {
-        if (!mBinaryDictionary.addUnigramEntry(word, frequency,
-                false /* isBeginningOfSentence */, isNotAWord, isPossiblyOffensive, timestamp)) {
-            Log.e(TAG, "Cannot add unigram entry. word: " + word);
-        }
+        // A failure is not logged: the word can be a contact name or a personal dictionary word.
+        mBinaryDictionary.addUnigramEntry(word, frequency,
+                false /* isBeginningOfSentence */, isNotAWord, isPossiblyOffensive, timestamp);
     }
 
     /**
@@ -685,6 +695,10 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
     }
 
     public void dumpAllWordsForDebug() {
+        // This writes every word of the dictionary to the log, so it only works in debug builds.
+        if (!DebugFlags.DEBUG_ENABLED) {
+            return;
+        }
         reloadDictionaryIfRequired();
         final String tag = TAG;
         final String dictName = mDictName;

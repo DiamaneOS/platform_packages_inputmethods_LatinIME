@@ -1236,6 +1236,9 @@ public final class InputLogic {
     }
 
     void unlearnWord(final String word, final SettingsValues settingsValues, final int eventType) {
+        // Learned words are not changed from fields that ask for no personalized learning, such
+        // as incognito tabs and password fields.
+        if (settingsValues.mInputAttributes.mNoPersonalizedLearning) return;
         final NgramContext ngramContext = mConnection.getNgramContextFromNthPreviousWord(
             settingsValues.mSpacingAndPunctuations, 2);
         final long timeStampInSeconds = TimeUnit.MILLISECONDS.toSeconds(
@@ -1436,6 +1439,9 @@ public final class InputLogic {
         // That's to avoid unintended additions in some sensitive fields, or fields that
         // expect to receive non-words.
         if (!settingsValues.mAutoCorrectionEnabledPerUserSettings) return;
+        // Nothing typed in fields that ask for no personalized learning, such as incognito tabs
+        // and password fields, is learned.
+        if (settingsValues.mInputAttributes.mNoPersonalizedLearning) return;
         if (mConnection.hasSlowInputConnection()) {
             // Since we don't unlearn when the user backspaces on a slow InputConnection,
             // turn off learning to guard against adding typos that the user later deletes.
@@ -2263,7 +2269,8 @@ public final class InputLogic {
                         // hence 2; if we aren't, we should just skip whitespace if any, so 1.
                         mWordComposer.isComposingWord() ? 2 : 1),
                 keyboard,
-                new SettingsValuesForSuggestion(settingsValues.mBlockPotentiallyOffensive),
+                new SettingsValuesForSuggestion(settingsValues.mBlockPotentiallyOffensive,
+                        !settingsValues.mInputAttributes.mNoPersonalizedLearning),
                 settingsValues.mAutoCorrectionEnabledPerUserSettings,
                 inputStyle, sequenceNumber, callback);
     }

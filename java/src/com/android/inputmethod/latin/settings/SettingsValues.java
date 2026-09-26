@@ -135,7 +135,12 @@ public class SettingsValues {
         mAutoCap = prefs.getBoolean(Settings.PREF_AUTO_CAP, true);
         mVibrateOn = Settings.readVibrationEnabled(prefs, res);
         mSoundOn = Settings.readKeypressSoundEnabled(prefs, res);
-        mKeyPreviewPopupOn = Settings.readKeyPreviewPopupEnabled(prefs, res);
+        // Key preview popups show each pressed key enlarged above the keyboard, so they are never
+        // shown in password fields whose text is hidden. Visible password fields show their text
+        // and follow the setting. Both LatinIME and KeyboardSwitcher (on every layout change,
+        // such as shift) enable them from this value.
+        mKeyPreviewPopupOn = Settings.readKeyPreviewPopupEnabled(prefs, res)
+                && !inputAttributes.mIsObscuredPasswordField;
         mSlidingKeyInputPreviewEnabled = prefs.getBoolean(
                 DebugSettings.PREF_SLIDING_KEY_INPUT_PREVIEW, true);
         mShowsVoiceInputKey = needsToShowVoiceInputKey(prefs, res)

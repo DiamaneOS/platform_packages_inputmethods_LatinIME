@@ -624,6 +624,18 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
         mHandler.onCreate();
 
+        // Register to load the personal dictionaries, which are kept in credential-protected
+        // storage, when the user unlocks the device. This is done before the dictionaries are
+        // first set up so that an unlock right after that cannot be missed. The broadcast is sent
+        // only by the system, which reaches receivers that are not exported.
+        final IntentFilter userUnlockedFilter = new IntentFilter(Intent.ACTION_USER_UNLOCKED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(mUserUnlockedReceiver, userUnlockedFilter,
+                    Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(mUserUnlockedReceiver, userUnlockedFilter);
+        }
+
         // TODO: Resolve mutual dependencies of {@link #loadSettings()} and
         // {@link #resetDictionaryFacilitatorIfNecessary()}.
         loadSettings();
@@ -729,7 +741,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             subtypeLocale = subtypeSwitcherLocale;
         }
         if (mDictionaryFacilitator.isForLocale(subtypeLocale)
-                && mDictionaryFacilitator.isForAccount(mSettings.getCurrent().mAccount)) {
+                && mDictionaryFacilitator.isForAccount(mSettings.getCurrent().mAccount)
+                && !mDictionaryFacilitator.needsResetAfterUserUnlock(this)) {
             return;
         }
         resetDictionaryFacilitator(subtypeLocale);
@@ -773,6 +786,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     public void onDestroy() {
         mDictionaryFacilitator.closeDictionaries();
         mSettings.onDestroy();
+        unregisterReceiver(mUserUnlockedReceiver);
         unregisterReceiver(mHideSoftInputReceiver);
         unregisterReceiver(mRingerModeChangeReceiver);
         unregisterReceiver(mDictionaryPackInstallReceiver);
@@ -783,6 +797,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @UsedForTesting
     public void recycle() {
+        unregisterReceiver(mUserUnlockedReceiver);
         unregisterReceiver(mDictionaryPackInstallReceiver);
         unregisterReceiver(mDictionaryDumpBroadcastReceiver);
         unregisterReceiver(mRingerModeChangeReceiver);
@@ -980,8 +995,12 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                     + ", word caps = "
                     + ((editorInfo.inputType & InputType.TYPE_TEXT_FLAG_CAP_WORDS) != 0));
         }
-        Log.i(TAG, "Starting input. Cursor position = "
-                + editorInfo.initialSelStart + "," + editorInfo.initialSelEnd);
+        // Only logged in debug builds: the cursor position gives away how long the text is, for
+        // example a password when the field restarts input.
+        if (DebugFlags.DEBUG_ENABLED) {
+            Log.i(TAG, "Starting input. Cursor position = "
+                    + editorInfo.initialSelStart + "," + editorInfo.initialSelEnd);
+        }
         // TODO: Consolidate these checks with {@link InputAttributes}.
         if (InputAttributes.inPrivateImeOptions(null, NO_MICROPHONE_COMPAT, editorInfo)) {
             Log.w(TAG, "Deprecated private IME option specified: " + editorInfo.privateImeOptions);
@@ -1953,6 +1972,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // related to handling of hardware key events that we may want to implement in the future:
     // boolean onKeyLongPress(final int keyCode, final KeyEvent event);
     // boolean onKeyMultiple(final int keyCode, final int count, final KeyEvent event);
+
+    // Loads the personal dictionaries once the user unlocks the device.
+    private final BroadcastReceiver mUserUnlockedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(final Context context, final Intent intent) {
+            if (Intent.ACTION_USER_UNLOCKED.equals(intent.getAction())) {
+                resetDictionaryFacilitatorIfNecessary();
+            }
+        }
+    };
 
     // receive ringer mode change.
     private final BroadcastReceiver mRingerModeChangeReceiver = new BroadcastReceiver() {

@@ -89,7 +89,9 @@ public class DictionaryFacilitatorLruCache {
 
     public DictionaryFacilitator get(final Locale locale) {
         synchronized (mLock) {
-            if (!mDictionaryFacilitator.isForLocale(locale)) {
+            // After the user unlocks the device, the reset adds the personal dictionaries.
+            if (!mDictionaryFacilitator.isForLocale(locale)
+                    || mDictionaryFacilitator.needsResetAfterUserUnlock(mContext)) {
                 mLocale = locale;
                 resetDictionariesForLocaleLocked();
             }

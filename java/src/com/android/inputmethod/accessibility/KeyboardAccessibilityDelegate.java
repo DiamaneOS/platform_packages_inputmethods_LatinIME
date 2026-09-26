@@ -182,7 +182,8 @@ public class KeyboardAccessibilityDelegate<KV extends KeyboardView>
             onHoverExit(event);
             break;
         default:
-            Log.w(getClass().getSimpleName(), "Unknown hover event: " + event);
+            // Only the action is logged: the event holds touch coordinates.
+            Log.w(getClass().getSimpleName(), "Unknown hover event: " + event.getActionMasked());
             break;
         }
         return true;

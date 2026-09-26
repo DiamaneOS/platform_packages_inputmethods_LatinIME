@@ -19,6 +19,7 @@ package com.android.inputmethod.latin.personalization;
 import android.content.Context;
 import android.util.Log;
 
+import com.android.inputmethod.latin.PersonalDictionaryStorage;
 import com.android.inputmethod.latin.common.FileUtils;
 
 import java.io.File;
@@ -79,7 +80,13 @@ public class PersonalizationHelper {
                 }
             }
             sLangUserHistoryDictCache.clear();
-            final File filesDir = context.getFilesDir();
+            // User history dictionaries are kept in credential-protected storage, which cannot be
+            // read until the user unlocks the device. Copies in device-protected storage are
+            // deleted by PersonalDictionaryStorage#deleteDeviceProtectedCopies.
+            if (!PersonalDictionaryStorage.isAvailable(context)) {
+                return;
+            }
+            final File filesDir = PersonalDictionaryStorage.getFilesDir(context);
             if (filesDir == null) {
                 Log.e(TAG, "context.getFilesDir() returned null.");
                 return;

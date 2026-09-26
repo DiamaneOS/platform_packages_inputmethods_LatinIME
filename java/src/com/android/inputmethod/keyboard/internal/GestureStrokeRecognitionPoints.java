@@ -207,11 +207,8 @@ public final class GestureStrokeRecognitionPoints {
         final int lastIndex = getLength() - 1;
         // The point that is created by {@link duplicateLastPointWith(int)} may have later event
         // time than the next {@link MotionEvent}. To maintain the monotonicity of the event time,
-        // drop the successive point here.
+        // drop the successive point here. This is not logged: the points are touch coordinates.
         if (lastIndex >= 0 && mEventTimes.get(lastIndex) > time) {
-            Log.w(TAG, String.format("[%d] drop stale event: %d,%d|%d last: %d,%d|%d", mPointerId,
-                    x, y, time, mXCoordinates.get(lastIndex), mYCoordinates.get(lastIndex),
-                    mEventTimes.get(lastIndex)));
             return;
         }
         mEventTimes.add(time);

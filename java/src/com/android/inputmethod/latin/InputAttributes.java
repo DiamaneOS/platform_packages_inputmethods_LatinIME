@@ -40,6 +40,17 @@ public final class InputAttributes {
     final public String mTargetApplicationPackageName;
     final public boolean mInputTypeNoAutoCorrect;
     final public boolean mIsPasswordField;
+    /**
+     * Whether this is a password field whose text is hidden. Unlike {@link #mIsPasswordField},
+     * this leaves out visible password fields, which show their text.
+     */
+    final public boolean mIsObscuredPasswordField;
+    /**
+     * Whether nothing typed in this field may be learned and no learned word may be suggested:
+     * the editor set {@link EditorInfo#IME_FLAG_NO_PERSONALIZED_LEARNING} (incognito tabs,
+     * password managers) or this is a password field.
+     */
+    final public boolean mNoPersonalizedLearning;
     final public boolean mShouldShowSuggestions;
     final public boolean mApplicationSpecifiedCompletionOn;
     final public boolean mShouldInsertSpacesAutomatically;
@@ -66,8 +77,10 @@ public final class InputAttributes {
         final int inputType = null != editorInfo ? editorInfo.inputType : 0;
         final int inputClass = inputType & InputType.TYPE_MASK_CLASS;
         mInputType = inputType;
-        mIsPasswordField = InputTypeUtils.isPasswordInputType(inputType)
+        mIsObscuredPasswordField = InputTypeUtils.isPasswordInputType(inputType);
+        mIsPasswordField = mIsObscuredPasswordField
                 || InputTypeUtils.isVisiblePasswordInputType(inputType);
+        mNoPersonalizedLearning = mIsPasswordField || hasNoPersonalizedLearningFlag(editorInfo);
         if (inputClass != InputType.TYPE_CLASS_TEXT) {
             // If we are not looking at a TYPE_CLASS_TEXT field, the following strange
             // cases may arise, so we do a couple validity checks for them. If it's a
@@ -150,7 +163,16 @@ public final class InputAttributes {
     }
 
     public boolean isSameInputType(final EditorInfo editorInfo) {
-        return editorInfo.inputType == mInputType;
+        // An editor that only turns IME_FLAG_NO_PERSONALIZED_LEARNING on or off, such as a
+        // browser switching to an incognito tab, also needs these attributes reloaded.
+        return editorInfo.inputType == mInputType
+                && mNoPersonalizedLearning
+                        == (mIsPasswordField || hasNoPersonalizedLearningFlag(editorInfo));
+    }
+
+    private static boolean hasNoPersonalizedLearningFlag(final EditorInfo editorInfo) {
+        return null != editorInfo
+                && 0 != (editorInfo.imeOptions & EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
     }
 
     private boolean hasNoMicrophoneKeyOption() {
