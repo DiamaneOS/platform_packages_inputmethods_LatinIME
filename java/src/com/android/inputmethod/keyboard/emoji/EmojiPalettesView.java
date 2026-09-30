@@ -49,6 +49,8 @@ import com.android.inputmethod.latin.AudioAndHapticFeedbackManager;
 import com.android.inputmethod.latin.R;
 import com.android.inputmethod.latin.RichInputMethodSubtype;
 import com.android.inputmethod.latin.common.Constants;
+import com.android.inputmethod.latin.settings.Settings;
+import com.android.inputmethod.latin.settings.SettingsValues;
 import com.android.inputmethod.latin.utils.ResourceUtils;
 
 /**
@@ -345,7 +347,12 @@ public final class EmojiPalettesView extends LinearLayout implements OnTabChange
      */
     @Override
     public void onReleaseKey(final Key key) {
-        mEmojiPalettesAdapter.addRecentKey(key);
+        // Emoji typed in fields that ask for no personalized learning, such as incognito tabs
+        // and password fields, are not added to the saved recent emoji.
+        final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+        if (settingsValues == null || !settingsValues.mInputAttributes.mNoPersonalizedLearning) {
+            mEmojiPalettesAdapter.addRecentKey(key);
+        }
         mEmojiCategory.saveLastTypedCategoryPage();
         final int code = key.getCode();
         if (code == Constants.CODE_OUTPUT_TEXT) {
