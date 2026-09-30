@@ -16,6 +16,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.os.Build;
 
 import androidx.test.InstrumentationRegistry;
@@ -104,6 +105,23 @@ public class ManifestPrivacyTests {
                 .setPackage(context.getPackageName());
         assertTrue(context.getPackageManager()
                 .queryBroadcastReceivers(intent, 0 /* flags */).isEmpty());
+    }
+
+    @Test
+    public void testLockedBootCompletedReachesSystemBroadcastReceiver() {
+        // Old copies of the personal dictionaries in device-protected storage are deleted on
+        // this broadcast, which only direct boot aware receivers get, before the first unlock.
+        final Context context = getContext();
+        final Intent intent = new Intent(Intent.ACTION_LOCKED_BOOT_COMPLETED)
+                .setPackage(context.getPackageName());
+        boolean found = false;
+        for (final ResolveInfo info : context.getPackageManager().queryBroadcastReceivers(
+                intent, PackageManager.MATCH_DIRECT_BOOT_AWARE)) {
+            if (SystemBroadcastReceiver.class.getName().equals(info.activityInfo.name)) {
+                found = true;
+            }
+        }
+        assertTrue(found);
     }
 
     @Test
