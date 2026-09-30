@@ -106,6 +106,11 @@ public class DownloadManagerWrapper {
             // This is expected to happen on boot when the device is encrypted.
         } catch (SQLiteException e) {
             Log.e(TAG, "Can't enqueue a request with the download manager", e);
+        } catch (SecurityException e) {
+            // This app holds neither INTERNET nor DOWNLOAD_WITHOUT_NOTIFICATION, so the download
+            // manager refuses its requests. Nothing starts a download (there is no metadata URI),
+            // but a refusal must not crash the keyboard process.
+            Log.e(TAG, "Not allowed to enqueue a request with the download manager", e);
         }
         return 0;
     }

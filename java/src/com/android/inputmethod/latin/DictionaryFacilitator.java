@@ -121,6 +121,13 @@ public interface DictionaryFacilitator {
             final String dictNamePrefix,
             @Nullable final DictionaryInitializationListener listener);
 
+    /**
+     * Returns whether the dictionaries were set up before the user unlocked the device, without
+     * the personal dictionaries kept in credential-protected storage, and those can be used now.
+     * {@link #resetDictionaries} then has to be called again to add them.
+     */
+    boolean needsResetAfterUserUnlock(final Context context);
+
     @UsedForTesting
     void resetDictionariesForTesting(
             final Context context,
