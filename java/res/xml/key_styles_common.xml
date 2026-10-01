@@ -86,13 +86,14 @@
                 latin:backgroundType="action" />
         </case>
         <!-- keyboardTheme="LXXLight|LXXDark" -->
+        <!-- DiamaneOS: the emoji key sits beside the space bar as a key like ?123, not as the
+             action key's tile: colour stays on the action key alone. -->
         <default>
             <key-style
                 latin:styleName="emojiKeyStyle"
-                latin:keySpec="!icon/emoji_action_key|!code/key_emoji"
-                latin:keyLabelFlags="keepBackgroundAspectRatio"
+                latin:keySpec="!icon/emoji_normal_key|!code/key_emoji"
                 latin:keyActionFlags="noKeyPreview"
-                latin:backgroundType="action" />
+                latin:backgroundType="functional" />
         </default>
     </switch>
     <include
