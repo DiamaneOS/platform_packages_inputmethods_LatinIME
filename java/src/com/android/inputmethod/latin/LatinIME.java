@@ -31,7 +31,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.inputmethodservice.InputMethodService;
 import android.media.AudioManager;
 import android.os.Build;
@@ -50,6 +53,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.EditorInfo;
@@ -161,6 +165,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private RichInputMethodManager mRichImm;
     @UsedForTesting final KeyboardSwitcher mKeyboardSwitcher;
+
+    /** How tall the keyboard's background is drawn to read its colour at the bottom edge. */
+    private static final int BACKGROUND_SAMPLE_HEIGHT_PX = 32;
     private final SubtypeState mSubtypeState = new SubtypeState();
     private EmojiAltPhysicalKeyDetector mEmojiAltPhysicalKeyDetector;
     private StatsUtilsManager mStatsUtilsManager;
@@ -2179,8 +2186,41 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         if (BuildCompatUtils.EFFECTIVE_SDK_INT > Build.VERSION_CODES.M) {
             // For N and later, IMEs can specify Color.TRANSPARENT to make the navigation bar
             // transparent.  For other colors the system uses the default color.
-            getWindow().getWindow().setNavigationBarColor(
-                    visible ? Color.BLACK : Color.TRANSPARENT);
+            // DiamaneOS: under the keyboard the bar takes the keyboard's own background colour,
+            // so the keyboard reaches the bottom of the screen, where it was a black band.
+            final int color = visible ? getKeyboardBottomColor() : Color.TRANSPARENT;
+            final Window window = getWindow().getWindow();
+            window.setNavigationBarColor(color);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // Dark navigation keys over a light keyboard.
+                final boolean light = visible && Color.luminance(color) > 0.5f;
+                window.getInsetsController().setSystemBarsAppearance(
+                        light ? WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS : 0,
+                        WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
         }
+    }
+
+    /**
+     * The opaque colour of the keyboard's background (its theme's, or a resource overlay's) at
+     * its bottom edge, or black before there is a keyboard.
+     */
+    private int getKeyboardBottomColor() {
+        final MainKeyboardView keyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        final Drawable background = keyboardView == null ? null : keyboardView.getBackground();
+        final Drawable.ConstantState state =
+                background == null ? null : background.getConstantState();
+        if (state == null) {
+            return Color.BLACK;
+        }
+        // A copy, so the view's own drawable keeps its bounds.
+        final Drawable sample = state.newDrawable(getResources()).mutate();
+        final Bitmap bitmap = Bitmap.createBitmap(1, BACKGROUND_SAMPLE_HEIGHT_PX,
+                Bitmap.Config.ARGB_8888);
+        sample.setBounds(0, 0, 1, BACKGROUND_SAMPLE_HEIGHT_PX);
+        sample.draw(new Canvas(bitmap));
+        final int color = bitmap.getPixel(0, BACKGROUND_SAMPLE_HEIGHT_PX - 1);
+        bitmap.recycle();
+        return color | 0xFF000000;
     }
 }
