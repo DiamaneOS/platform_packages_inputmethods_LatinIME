@@ -18,6 +18,7 @@ package com.android.inputmethod.latin;
 
 import android.Manifest;
 import android.content.Context;
+import android.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.LruCache;
@@ -32,6 +33,7 @@ import com.android.inputmethod.latin.common.StringUtils;
 import com.android.inputmethod.latin.permissions.PermissionsUtil;
 import com.android.inputmethod.latin.personalization.UserHistoryDictionary;
 import com.android.inputmethod.latin.settings.SettingsValuesForSuggestion;
+import com.android.inputmethod.latin.spellcheck.AndroidSpellCheckerService;
 import com.android.inputmethod.latin.utils.ExecutorUtils;
 import com.android.inputmethod.latin.utils.SuggestionResults;
 
@@ -389,6 +391,15 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         // the contacts dictionary above.
         if (canUsePersonalDicts && !subDictTypesToUse.contains(Dictionary.TYPE_CONTACTS)) {
             PersonalDictionaryStorage.deleteContactsDictionaries(context, dictNamePrefix);
+        }
+        // The spell checker has its own contacts dictionaries and setting, and deletes them only
+        // when it is used. So they are also deleted here once it cannot use them either, in case
+        // it is not used again.
+        if (canUsePersonalDicts && !(contactsPermissionGranted
+                && AndroidSpellCheckerService.isContactsDictionaryEnabled(
+                        PreferenceManager.getDefaultSharedPreferences(context)))) {
+            PersonalDictionaryStorage.deleteContactsDictionaries(context,
+                    AndroidSpellCheckerService.DICTIONARY_NAME_PREFIX);
         }
 
         if (mValidSpellingWordWriteCache != null) {
