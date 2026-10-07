@@ -19,6 +19,7 @@ package com.android.inputmethod.keyboard.emoji;
 import static com.android.inputmethod.latin.common.Constants.NOT_A_COORDINATE;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Color;
@@ -46,12 +47,15 @@ import com.android.inputmethod.keyboard.internal.KeyDrawParams;
 import com.android.inputmethod.keyboard.internal.KeyVisualAttributes;
 import com.android.inputmethod.keyboard.internal.KeyboardIconsSet;
 import com.android.inputmethod.latin.AudioAndHapticFeedbackManager;
+import com.android.inputmethod.latin.PersonalDictionaryStorage;
 import com.android.inputmethod.latin.R;
 import com.android.inputmethod.latin.RichInputMethodSubtype;
 import com.android.inputmethod.latin.common.Constants;
 import com.android.inputmethod.latin.settings.Settings;
 import com.android.inputmethod.latin.settings.SettingsValues;
 import com.android.inputmethod.latin.utils.ResourceUtils;
+
+import javax.annotation.Nullable;
 
 /**
  * View class to implement Emoji palettes.
@@ -347,12 +351,8 @@ public final class EmojiPalettesView extends LinearLayout implements OnTabChange
      */
     @Override
     public void onReleaseKey(final Key key) {
-        // Emoji typed in fields that ask for no personalized learning, such as incognito tabs
-        // and password fields, are not added to the saved recent emoji.
-        final SettingsValues settingsValues = Settings.getInstance().getCurrent();
-        if (settingsValues == null || !settingsValues.mInputAttributes.mNoPersonalizedLearning) {
-            mEmojiPalettesAdapter.addRecentKey(key);
-        }
+        // This is not shown or saved where recent emoji are not (see startEmojiPalettes()).
+        mEmojiPalettesAdapter.addRecentKey(key);
         mEmojiCategory.saveLastTypedCategoryPage();
         final int code = key.getCode();
         if (code == Constants.CODE_OUTPUT_TEXT) {
@@ -394,8 +394,28 @@ public final class EmojiPalettesView extends LinearLayout implements OnTabChange
         params.updateParams(mEmojiLayoutParams.getActionBarHeight(), keyVisualAttr);
         setupAlphabetKey(mAlphabetKeyLeft, switchToAlphaLabel, params);
         setupAlphabetKey(mAlphabetKeyRight, switchToAlphaLabel, params);
+        mEmojiCategory.loadRecentKeys(getRecentKeysPreferences());
         mEmojiPager.setAdapter(mEmojiPalettesAdapter);
-        mEmojiPager.setCurrentItem(mCurrentPagerPosition);
+        final int categoryIdToShow = mEmojiCategory.getCategoryIdToShow();
+        if (categoryIdToShow != mEmojiCategory.getCurrentCategoryId()) {
+            setCurrentCategoryId(categoryIdToShow, true /* force */);
+        } else {
+            mEmojiPager.setCurrentItem(mCurrentPagerPosition);
+        }
+    }
+
+    /**
+     * Returns where the recent emoji are kept, credential-protected storage, or null where they
+     * are neither shown nor saved: before the user unlocks the device and in fields that ask for
+     * no personalized learning, such as incognito tabs and password fields.
+     */
+    @Nullable
+    private SharedPreferences getRecentKeysPreferences() {
+        final SettingsValues settingsValues = Settings.getInstance().getCurrent();
+        if (settingsValues == null || settingsValues.mInputAttributes.mNoPersonalizedLearning) {
+            return null;
+        }
+        return PersonalDictionaryStorage.getRecentEmojiPreferences(getContext());
     }
 
     public void stopEmojiPalettes() {
