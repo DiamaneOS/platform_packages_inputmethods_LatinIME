@@ -5,12 +5,15 @@
 package com.android.inputmethod.latin;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.UserManager;
+import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.android.inputmethod.annotations.UsedForTesting;
 import com.android.inputmethod.compat.CompatUtils;
 import com.android.inputmethod.latin.common.FileUtils;
+import com.android.inputmethod.latin.settings.Settings;
 import com.android.inputmethod.latin.utils.ExecutorUtils;
 
 import java.io.File;
@@ -23,14 +26,16 @@ import javax.annotation.Nullable;
 /**
  * Storage of the personal dictionaries: the copy of the user (personal) dictionary, contact names
  * and learned words ({@link UserBinaryDictionary}, {@link ContactsBinaryDictionary} and
- * {@link com.android.inputmethod.latin.personalization.UserHistoryDictionary}).
+ * {@link com.android.inputmethod.latin.personalization.UserHistoryDictionary}), and of the recent
+ * emoji.
  *
  * The app keeps device-protected storage as its default because the keyboard has to work before
  * the first unlock, when the device passphrase is typed with it. Device-protected storage can be
  * read before that unlock, so these dictionaries are kept only in credential-protected storage
  * and are only opened once the user has unlocked. Before that the main dictionary is the only
- * one in use. If credential-protected storage cannot be reached, the personal dictionaries are
- * not used at all rather than being put in device-protected storage.
+ * one in use and no recent emoji are shown. If credential-protected storage cannot be reached,
+ * the personal dictionaries and recent emoji are not used at all rather than being put in
+ * device-protected storage.
  */
 public final class PersonalDictionaryStorage {
     private static final String TAG = PersonalDictionaryStorage.class.getSimpleName();
@@ -49,6 +54,10 @@ public final class PersonalDictionaryStorage {
     private static final String[] DICT_NAME_STEMS =
             { "userunigram", CONTACTS_DICT_NAME_STEM, "UserHistoryDictionary" };
     private static final String[] DICT_NAME_PREFIXES = { "", "spellcheck_" };
+
+    // Preferences file in credential-protected storage for the recent emoji, which earlier builds
+    // kept in the default preferences in device-protected storage.
+    private static final String RECENT_EMOJI_PREFS_NAME = "recent_emoji";
 
     private static final AtomicBoolean sDeviceProtectedCopiesDeleted = new AtomicBoolean(false);
 
@@ -99,39 +108,59 @@ public final class PersonalDictionaryStorage {
     }
 
     /**
-     * Deletes, in the background and once per process, the personal dictionary files that
-     * earlier builds kept in device-protected storage. Their contents are not moved: the user
-     * dictionary and contacts copies are rebuilt from their providers in credential-protected
-     * storage, and learned words, which are off by default, are lost once for users who had
-     * turned them on. Moving them would leave them readable before the first unlock.
+     * Returns the preferences that hold the recent emoji, in credential-protected storage, or null
+     * before the user unlocks the device or if there is no such storage.
+     */
+    @Nullable
+    public static SharedPreferences getRecentEmojiPreferences(final Context context) {
+        if (!isUserUnlocked(context)) {
+            return null;
+        }
+        final Context credentialProtectedContext = getCredentialProtectedContext(context);
+        return credentialProtectedContext == null ? null
+                : credentialProtectedContext.getSharedPreferences(
+                        RECENT_EMOJI_PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    /**
+     * Deletes, in the background and once per process, the personal dictionary files and the
+     * recent emoji that earlier builds kept in device-protected storage. Their contents are not
+     * moved: the user dictionary and contacts copies are rebuilt from their providers in
+     * credential-protected storage, and learned words, which are off by default, and recent
+     * emoji are lost once. Moving them would leave them readable before the first unlock.
      */
     public static void deleteDeviceProtectedCopies(final Context context) {
         if (!sDeviceProtectedCopiesDeleted.compareAndSet(false, true)) {
             return;
         }
-        final File deviceProtectedFilesDir =
-                context.createDeviceProtectedStorageContext().getFilesDir();
+        final Context deviceProtectedContext = context.createDeviceProtectedStorageContext();
         ExecutorUtils.getBackgroundExecutor(ExecutorUtils.KEYBOARD).execute(new Runnable() {
             @Override
             public void run() {
-                deleteFromDeviceProtectedFilesDir(deviceProtectedFilesDir);
+                deleteFromDeviceProtectedStorage(deviceProtectedContext);
             }
         });
     }
 
     /**
-     * Deletes on the calling thread the personal dictionary files that earlier builds kept in
-     * device-protected storage. {@link SystemBroadcastReceiver} calls this at boot, as it kills
-     * the process when this is not the current keyboard, before any dictionary is set up.
+     * Deletes on the calling thread the personal dictionary files and the recent emoji that
+     * earlier builds kept in device-protected storage. {@link SystemBroadcastReceiver} calls this
+     * at boot, as it kills the process when this is not the current keyboard, before any
+     * dictionary is set up.
      */
     static void deleteDeviceProtectedCopiesNow(final Context context) {
-        deleteFromDeviceProtectedFilesDir(
-                context.createDeviceProtectedStorageContext().getFilesDir());
+        deleteFromDeviceProtectedStorage(context.createDeviceProtectedStorageContext());
     }
 
-    private static void deleteFromDeviceProtectedFilesDir(final File deviceProtectedFilesDir) {
-        if (!deletePersonalDictionaryFiles(deviceProtectedFilesDir)) {
+    private static void deleteFromDeviceProtectedStorage(final Context deviceProtectedContext) {
+        if (!deletePersonalDictionaryFiles(deviceProtectedContext.getFilesDir())) {
             Log.e(TAG, "Cannot remove personal dictionaries from device-protected storage.");
+        }
+        final SharedPreferences prefs =
+                PreferenceManager.getDefaultSharedPreferences(deviceProtectedContext);
+        if (prefs.contains(Settings.PREF_EMOJI_RECENT_KEYS)
+                && !prefs.edit().remove(Settings.PREF_EMOJI_RECENT_KEYS).commit()) {
+            Log.e(TAG, "Cannot remove recent emoji from device-protected storage.");
         }
     }
 
