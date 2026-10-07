@@ -87,6 +87,10 @@ public class UserBinaryDictionary extends ExpandableBinaryDictionary {
             }
         };
         cres.registerContentObserver(Words.CONTENT_URI, true, mObserver);
+        // The file is only a copy of the user dictionary, which can have changed while the
+        // observer was not registered, for example while the keyboard was not running. A word the
+        // user deleted then stayed in the copy and was still suggested, so it is always rebuilt.
+        setNeedsToRecreate();
         reloadDictionaryIfRequired();
     }
 
