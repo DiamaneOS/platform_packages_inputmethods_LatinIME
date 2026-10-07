@@ -24,6 +24,7 @@ import android.view.inputmethod.BaseInputConnection;
 import androidx.test.filters.LargeTest;
 
 import com.android.inputmethod.latin.common.Constants;
+import com.android.inputmethod.latin.common.LocaleUtils;
 import com.android.inputmethod.latin.define.DecoderSpecificConstants;
 import com.android.inputmethod.latin.settings.Settings;
 
@@ -491,6 +492,28 @@ public class InputLogicTests extends InputTestsBase {
     // TODO: Add some tests for non-BMP characters
 
     public void testAutoCorrectByUserHistory() {
+        // Learned words are off by default. Turn them on and set up the dictionaries again so
+        // that the user history dictionary is in use.
+        final boolean previousUsePersonalizedDicts = setBooleanPreference(
+                Settings.PREF_KEY_USE_PERSONALIZED_DICTS, true, false /* defaultValue */);
+        mLatinIME.loadSettings();
+        mLatinIME.replaceDictionariesForTest(LocaleUtils.constructLocaleFromString("en_US"));
+        waitForDictionariesToBeLoaded();
+        mLatinIME.clearPersonalizedDictionariesForTest();
+        try {
+            helperTestAutoCorrectByUserHistory();
+        } finally {
+            mLatinIME.clearPersonalizedDictionariesForTest();
+            setBooleanPreference(Settings.PREF_KEY_USE_PERSONALIZED_DICTS,
+                    previousUsePersonalizedDicts, false /* defaultValue */);
+        }
+    }
+
+    private void helperTestAutoCorrectByUserHistory() {
+        // A word that is not in the main dictionary is learned only when it is typed the second
+        // time: the first time adds it to the user history with a count of 0.
+        type("qpmz");
+        type(Constants.CODE_SPACE);
         type("qpmz");
         type(Constants.CODE_SPACE);
 
