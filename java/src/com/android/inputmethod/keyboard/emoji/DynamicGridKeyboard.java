@@ -31,6 +31,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 /**
  * This is a Keyboard class where you can add keys dynamically shown in a grid layout
  */
@@ -40,7 +42,6 @@ final class DynamicGridKeyboard extends Keyboard {
     private static final int TEMPLATE_KEY_CODE_1 = 0x31;
     private final Object mLock = new Object();
 
-    private final SharedPreferences mPrefs;
     private final int mHorizontalStep;
     private final int mVerticalStep;
     private final int mColumnsNum;
@@ -50,8 +51,12 @@ final class DynamicGridKeyboard extends Keyboard {
     private final ArrayDeque<Key> mPendingKeys = new ArrayDeque<>();
 
     private List<Key> mCachedGridKeys;
+    // Where the recent keys are saved, or null if they are neither shown nor saved: before the
+    // user unlocks the device and in fields that ask for no personalized learning.
+    @Nullable
+    private SharedPreferences mRecentKeysPrefs;
 
-    public DynamicGridKeyboard(final SharedPreferences prefs, final Keyboard templateKeyboard,
+    public DynamicGridKeyboard(final Keyboard templateKeyboard,
             final int maxKeyCount, final int categoryId) {
         super(templateKeyboard);
         final Key key0 = getTemplateKey(TEMPLATE_KEY_CODE_0);
@@ -61,7 +66,6 @@ final class DynamicGridKeyboard extends Keyboard {
         mColumnsNum = mBaseWidth / mHorizontalStep;
         mMaxKeyCount = maxKeyCount;
         mIsRecents = categoryId == EmojiCategory.ID_RECENTS;
-        mPrefs = prefs;
     }
 
     private Key getTemplateKey(final int code) {
@@ -75,6 +79,9 @@ final class DynamicGridKeyboard extends Keyboard {
 
     public void addPendingKey(final Key usedKey) {
         synchronized (mLock) {
+            if (mRecentKeysPrefs == null) {
+                return;
+            }
             mPendingKeys.addLast(usedKey);
         }
     }
@@ -89,6 +96,9 @@ final class DynamicGridKeyboard extends Keyboard {
     }
 
     public void addKeyFirst(final Key usedKey) {
+        if (mIsRecents && mRecentKeysPrefs == null) {
+            return;
+        }
         addKey(usedKey, true);
         if (mIsRecents) {
             saveRecentKeys();
@@ -130,6 +140,9 @@ final class DynamicGridKeyboard extends Keyboard {
     }
 
     private void saveRecentKeys() {
+        if (mRecentKeysPrefs == null) {
+            return;
+        }
         final ArrayList<Object> keys = new ArrayList<>();
         for (final Key key : mGridKeys) {
             if (key.getOutputText() != null) {
@@ -139,7 +152,7 @@ final class DynamicGridKeyboard extends Keyboard {
             }
         }
         final String jsonStr = JsonUtils.listToJsonStr(keys);
-        Settings.writeEmojiRecentKeys(mPrefs, jsonStr);
+        Settings.writeEmojiRecentKeys(mRecentKeysPrefs, jsonStr);
     }
 
     private static Key getKeyByCode(final Collection<DynamicGridKeyboard> keyboards,
@@ -166,8 +179,23 @@ final class DynamicGridKeyboard extends Keyboard {
         return null;
     }
 
-    public void loadRecentKeys(final Collection<DynamicGridKeyboard> keyboards) {
-        final String str = Settings.readEmojiRecentKeys(mPrefs);
+    /**
+     * Replaces the keys with the recent keys saved in the given preferences, where keys used
+     * later are saved too. With null, no keys are shown and none are added or saved.
+     */
+    public void loadRecentKeys(final Collection<DynamicGridKeyboard> keyboards,
+            @Nullable final SharedPreferences prefs) {
+        synchronized (mLock) {
+            // Keys used since the last flush are saved where they were used first.
+            flushPendingRecentKeys();
+            mRecentKeysPrefs = prefs;
+            mGridKeys.clear();
+            mCachedGridKeys = null;
+        }
+        if (prefs == null) {
+            return;
+        }
+        final String str = Settings.readEmojiRecentKeys(prefs);
         final List<Object> keys = JsonUtils.jsonStrToList(str);
         for (final Object o : keys) {
             final Key key;
