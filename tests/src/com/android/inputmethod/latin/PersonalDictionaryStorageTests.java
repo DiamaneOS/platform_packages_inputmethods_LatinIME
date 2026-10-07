@@ -23,6 +23,7 @@ import androidx.test.runner.AndroidJUnit4;
 
 import com.android.inputmethod.latin.common.FileUtils;
 import com.android.inputmethod.latin.settings.Settings;
+import com.android.inputmethod.latin.spellcheck.AndroidSpellCheckerService;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -249,6 +250,39 @@ public class PersonalDictionaryStorageTests {
             facilitator.getSubDictForTesting(Dictionary.TYPE_USER).waitAllTasksForTests();
             assertFalse(contactsDict.exists());
         } finally {
+            closeAndDeleteTestDictionaries(facilitator);
+        }
+    }
+
+    @Test
+    public void testUnusedSpellCheckerContactsDictionariesAreDeleted() throws IOException {
+        final Context context = getContext();
+        // The spell checker's contacts dictionaries have a fixed name prefix. No locale has this
+        // name, so this file is of this test only.
+        final File contactsDict = new File(PersonalDictionaryStorage.getFilesDir(context),
+                AndroidSpellCheckerService.DICTIONARY_NAME_PREFIX + "contacts.zz_ZZ.dict");
+        FileUtils.deleteRecursively(contactsDict);
+        newDictDirectory(contactsDict.getParentFile(), contactsDict.getName());
+        // With its contacts setting off, the spell checker cannot use contact names, whether
+        // READ_CONTACTS is granted or not.
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        final boolean previousUseContacts =
+                AndroidSpellCheckerService.isContactsDictionaryEnabled(prefs);
+        assertTrue(prefs.edit()
+                .putBoolean(AndroidSpellCheckerService.PREF_USE_CONTACTS_KEY, false).commit());
+        final DictionaryFacilitatorImpl facilitator = new DictionaryFacilitatorImpl();
+        try {
+            // A dictionary setup of the keyboard, not of the spell checker.
+            facilitator.resetDictionaries(context, Locale.US, false /* useContactsDict */,
+                    false /* usePersonalizedDicts */, false /* forceReloadMainDictionary */,
+                    null /* account */, TEST_DICT_NAME_PREFIX, null /* listener */);
+            // The deletion is queued on the executor that the dictionaries use.
+            facilitator.getSubDictForTesting(Dictionary.TYPE_USER).waitAllTasksForTests();
+            assertFalse(contactsDict.exists());
+        } finally {
+            prefs.edit().putBoolean(AndroidSpellCheckerService.PREF_USE_CONTACTS_KEY,
+                    previousUseContacts).commit();
+            FileUtils.deleteRecursively(contactsDict);
             closeAndDeleteTestDictionaries(facilitator);
         }
     }
