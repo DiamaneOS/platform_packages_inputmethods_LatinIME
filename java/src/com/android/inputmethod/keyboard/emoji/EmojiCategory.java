@@ -40,6 +40,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.annotation.Nullable;
+
 final class EmojiCategory {
     private final String TAG = EmojiCategory.class.getSimpleName();
 
@@ -157,6 +159,7 @@ final class EmojiCategory {
     private final ConcurrentHashMap<Long, DynamicGridKeyboard> mCategoryKeyboardMap =
             new ConcurrentHashMap<>();
 
+    private final int mDefaultCategoryId;
     private int mCurrentCategoryId = EmojiCategory.ID_UNSPECIFIED;
     private int mCurrentCategoryPageId = 0;
 
@@ -200,22 +203,40 @@ final class EmojiCategory {
             addShownCategoryId(EmojiCategory.ID_SYMBOLS);
         }
         addShownCategoryId(EmojiCategory.ID_EMOTICONS);
+        mDefaultCategoryId = defaultCategoryId;
 
-        DynamicGridKeyboard recentsKbd =
-                getKeyboard(EmojiCategory.ID_RECENTS, 0 /* categoryPageId */);
-        recentsKbd.loadRecentKeys(mCategoryKeyboardMap.values());
-
+        // The recent emoji are loaded by loadRecentKeys() each time the palettes are shown, as
+        // whether they may be shown depends on the field and on whether the user has unlocked.
+        // An empty recents tab is then left for the default category (getCategoryIdToShow()).
         mCurrentCategoryId = Settings.readLastShownEmojiCategoryId(mPrefs, defaultCategoryId);
         Log.i(TAG, "Last Emoji category id is " + mCurrentCategoryId);
         if (!isShownCategoryId(mCurrentCategoryId)) {
             Log.i(TAG, "Last emoji category " + mCurrentCategoryId +
                     " is invalid, starting in " + defaultCategoryId);
             mCurrentCategoryId = defaultCategoryId;
-        } else if (mCurrentCategoryId == EmojiCategory.ID_RECENTS &&
-                recentsKbd.getSortedKeys().isEmpty()) {
-            Log.i(TAG, "No recent emojis found, starting in category " + defaultCategoryId);
-            mCurrentCategoryId = defaultCategoryId;
         }
+    }
+
+    /**
+     * Shows in the recents tab the recent emoji saved in the given preferences, where emoji used
+     * later are saved too, or none and saves none if null.
+     */
+    public void loadRecentKeys(@Nullable final SharedPreferences recentKeysPrefs) {
+        getKeyboard(EmojiCategory.ID_RECENTS, 0 /* categoryPageId */)
+                .loadRecentKeys(mCategoryKeyboardMap.values(), recentKeysPrefs);
+    }
+
+    /**
+     * Returns the category to show: the current one, or the default category if the current one
+     * is the recents tab and it has no emoji.
+     */
+    public int getCategoryIdToShow() {
+        if (mCurrentCategoryId == EmojiCategory.ID_RECENTS && getKeyboard(
+                EmojiCategory.ID_RECENTS, 0 /* categoryPageId */).getSortedKeys().isEmpty()) {
+            Log.i(TAG, "No recent emojis found, starting in category " + mDefaultCategoryId);
+            return mDefaultCategoryId;
+        }
+        return mCurrentCategoryId;
     }
 
     private void addShownCategoryId(final int categoryId) {
@@ -370,7 +391,7 @@ final class EmojiCategory {
             }
 
             if (categoryId == EmojiCategory.ID_RECENTS) {
-                final DynamicGridKeyboard kbd = new DynamicGridKeyboard(mPrefs,
+                final DynamicGridKeyboard kbd = new DynamicGridKeyboard(
                         mLayoutSet.getKeyboard(KeyboardId.ELEMENT_EMOJI_RECENTS),
                         mMaxPageKeyCount, categoryId);
                 mCategoryKeyboardMap.put(categoryKeyboardMapKey, kbd);
@@ -381,7 +402,7 @@ final class EmojiCategory {
             final Key[][] sortedKeys = sortKeysIntoPages(
                     keyboard.getSortedKeys(), mMaxPageKeyCount);
             for (int pageId = 0; pageId < sortedKeys.length; ++pageId) {
-                final DynamicGridKeyboard tempKeyboard = new DynamicGridKeyboard(mPrefs,
+                final DynamicGridKeyboard tempKeyboard = new DynamicGridKeyboard(
                         mLayoutSet.getKeyboard(KeyboardId.ELEMENT_EMOJI_RECENTS),
                         mMaxPageKeyCount, categoryId);
                 for (final Key emojiKey : sortedKeys[pageId]) {

@@ -13,13 +13,16 @@ import static org.junit.Assert.assertTrue;
 
 import android.annotation.TargetApi;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
+import android.preference.PreferenceManager;
 
 import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.MediumTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.inputmethod.latin.common.FileUtils;
+import com.android.inputmethod.latin.settings.Settings;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -165,6 +168,49 @@ public class PersonalDictionaryStorageTests {
             assertFalse(contactsDict.exists());
         } finally {
             FileUtils.deleteRecursively(contactsDict);
+        }
+    }
+
+    @Test
+    public void testRecentEmojiAreInCredentialProtectedStorage() {
+        final Context context = getContext();
+        final SharedPreferences prefs =
+                PersonalDictionaryStorage.getRecentEmojiPreferences(context);
+        assertNotNull(prefs);
+        final File credentialProtectedPrefsDir = new File(PersonalDictionaryStorage
+                .getCredentialProtectedContext(context).getDataDir(), "shared_prefs");
+        final File deviceProtectedPrefsDir = new File(
+                context.createDeviceProtectedStorageContext().getDataDir(), "shared_prefs");
+        final File prefsFile = new File(credentialProtectedPrefsDir, "recent_emoji.xml");
+        final boolean prefsFileExisted = prefsFile.exists();
+        // A key of this test only, which leaves the keyboard's recent emoji as they are.
+        final String testKey = TEST_DICT_NAME_PREFIX + "key";
+        try {
+            assertTrue(prefs.edit().putString(testKey, "value").commit());
+            assertTrue(prefsFile.exists());
+            assertFalse(new File(deviceProtectedPrefsDir, prefsFile.getName()).exists());
+        } finally {
+            prefs.edit().remove(testKey).commit();
+            if (!prefsFileExisted) {
+                PersonalDictionaryStorage.getCredentialProtectedContext(context)
+                        .deleteSharedPreferences("recent_emoji");
+            }
+        }
+    }
+
+    @Test
+    public void testDeleteDeviceProtectedCopiesNowRemovesRecentEmoji() {
+        final Context context = getContext();
+        final SharedPreferences deviceProtectedPrefs = PreferenceManager
+                .getDefaultSharedPreferences(context.createDeviceProtectedStorageContext());
+        // Recent emoji are no longer kept in device-protected storage, so this key is unused.
+        assertTrue(deviceProtectedPrefs.edit()
+                .putString(Settings.PREF_EMOJI_RECENT_KEYS, "[{\"Integer\":128512}]").commit());
+        try {
+            PersonalDictionaryStorage.deleteDeviceProtectedCopiesNow(context);
+            assertFalse(deviceProtectedPrefs.contains(Settings.PREF_EMOJI_RECENT_KEYS));
+        } finally {
+            deviceProtectedPrefs.edit().remove(Settings.PREF_EMOJI_RECENT_KEYS).commit();
         }
     }
 
