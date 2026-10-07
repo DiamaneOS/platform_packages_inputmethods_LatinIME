@@ -60,7 +60,7 @@ public final class AndroidSpellCheckerService extends SpellCheckerService
     private static final int SPELLCHECKER_DUMMY_KEYBOARD_WIDTH = 480;
     private static final int SPELLCHECKER_DUMMY_KEYBOARD_HEIGHT = 301;
 
-    private static final String DICTIONARY_NAME_PREFIX = "spellcheck_";
+    public static final String DICTIONARY_NAME_PREFIX = "spellcheck_";
 
     private static final String[] EMPTY_STRING_ARRAY = new String[0];
 
@@ -124,10 +124,17 @@ public final class AndroidSpellCheckerService extends SpellCheckerService
         }
     }
 
+    /**
+     * Returns whether the setting to look up contact names in the spell checker is on.
+     */
+    public static boolean isContactsDictionaryEnabled(final SharedPreferences prefs) {
+        return prefs.getBoolean(PREF_USE_CONTACTS_KEY, true);
+    }
+
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences prefs, final String key) {
         if (!PREF_USE_CONTACTS_KEY.equals(key)) return;
-        final boolean useContactsDictionary = prefs.getBoolean(PREF_USE_CONTACTS_KEY, true);
+        final boolean useContactsDictionary = isContactsDictionaryEnabled(prefs);
         mDictionaryFacilitatorCache.setUseContactsDictionary(useContactsDictionary);
     }
 

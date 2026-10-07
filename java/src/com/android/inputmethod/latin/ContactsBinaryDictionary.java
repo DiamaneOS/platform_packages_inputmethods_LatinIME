@@ -57,6 +57,10 @@ public class ContactsBinaryDictionary extends ExpandableBinaryDictionary
         mUseFirstLastBigrams = ContactsDictionaryUtils.useFirstLastBigramsForLocale(locale);
         mContactsManager = new ContactsManager(context);
         mContactsManager.registerForUpdates(this /* listener */);
+        // The file is only a copy of the contact names, which can have changed while the observer
+        // was not registered, for example while the keyboard was not running. A deleted contact
+        // then stayed in the copy and was still suggested, so it is always rebuilt.
+        setNeedsToRecreate();
         reloadDictionaryIfRequired();
     }
 
