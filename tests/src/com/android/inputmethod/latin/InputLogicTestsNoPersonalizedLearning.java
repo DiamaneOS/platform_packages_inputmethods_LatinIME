@@ -18,7 +18,9 @@ import com.android.inputmethod.latin.settings.Settings;
  * browser tabs, neither teach the keyboard words nor get learned words suggested.
  *
  * Like InputLogicTests#testAutoCorrectByUserHistory, these tests rely on "qpmz" being
- * auto-corrected from "qpmx" only once "qpmz" has been learned.
+ * auto-corrected from "qpmx" only once "qpmz" has been learned. A word that is not in the main
+ * dictionary is learned only when it is typed the second time: the first time adds it to the user
+ * history with a count of 0, which is never suggested.
  */
 @LargeTest
 public class InputLogicTestsNoPersonalizedLearning extends InputTestsBase {
@@ -69,6 +71,12 @@ public class InputLogicTestsNoPersonalizedLearning extends InputTestsBase {
         return mEditText.getText().subSequence(startIndex, endIndex).toString();
     }
 
+    // Types the word to learn as many times as learning it takes in a field that allows it.
+    private void typeLearnedWord() {
+        typeWordAndSpace(LEARNED_WORD);
+        typeWordAndSpace(LEARNED_WORD);
+    }
+
     // Finishes input in the current field and starts it in a new one of the same editor.
     private void startInputInNewField(final boolean noPersonalizedLearning) {
         mLatinIME.onFinishInputView(true /* finishingInput */);
@@ -90,14 +98,14 @@ public class InputLogicTestsNoPersonalizedLearning extends InputTestsBase {
 
     public void testLearnedWordIsUsedWithLearning() {
         assertFalse(Settings.getInstance().getCurrent().mInputAttributes.mNoPersonalizedLearning);
-        typeWordAndSpace(LEARNED_WORD);
+        typeLearnedWord();
         assertEquals("auto-corrected by user history", LEARNED_WORD + " ",
                 typeWordAndSpace(SIMILAR_WORD));
     }
 
     public void testNothingIsLearnedWithNoPersonalizedLearningFlag() {
         assertTrue(Settings.getInstance().getCurrent().mInputAttributes.mNoPersonalizedLearning);
-        typeWordAndSpace(LEARNED_WORD);
+        typeLearnedWord();
         // Learned words are not suggested in the incognito field either, so this checks in a
         // field that allows learning that the word has not been learned.
         startInputInNewField(false /* noPersonalizedLearning */);
@@ -106,7 +114,7 @@ public class InputLogicTestsNoPersonalizedLearning extends InputTestsBase {
     }
 
     public void testLearnedWordIsNotUsedWithNoPersonalizedLearningFlag() {
-        typeWordAndSpace(LEARNED_WORD);
+        typeLearnedWord();
         // Checks that the word has been learned, then that it is not used in an incognito field.
         startInputInNewField(false /* noPersonalizedLearning */);
         assertEquals("auto-corrected by user history", LEARNED_WORD + " ",
