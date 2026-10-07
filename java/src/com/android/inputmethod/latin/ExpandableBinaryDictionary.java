@@ -305,6 +305,7 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
     /**
      * Adds unigram information of a word to the dictionary. May overwrite an existing entry.
      */
+    @UsedForTesting
     public void addUnigramEntry(final String word, final int frequency,
             final boolean isNotAWord, final boolean isPossiblyOffensive, final int timestamp) {
         updateDictionaryWithWriteLock(new Runnable() {
