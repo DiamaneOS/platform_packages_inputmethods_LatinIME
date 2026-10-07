@@ -287,6 +287,78 @@ public class PersonalDictionaryStorageTests {
         }
     }
 
+    // A word that is neither in the user dictionary nor a contact name.
+    private static final String STALE_WORD = "qzxwvkjq";
+    private static final Locale TEST_LOCALE = new Locale("zz");
+
+    @Test
+    public void testUserDictionaryCopyIsRebuiltWhenLoaded() {
+        final Context context = getContext();
+        final File dictFile = new File(context.getCacheDir(),
+                TEST_DICT_NAME_PREFIX + "userunigram.zz.dict");
+        FileUtils.deleteRecursively(dictFile);
+        UserBinaryDictionary dict = new UserBinaryDictionary(context, TEST_LOCALE,
+                false /* alsoUseMoreRestrictiveLocales */, dictFile, "unused");
+        try {
+            // As a word that the user dictionary had when the copy was last written.
+            writeStaleWord(dict, dictFile);
+            dict.close();
+            // As a start of the keyboard after the word was deleted while it was not running.
+            dict = new UserBinaryDictionary(context, TEST_LOCALE,
+                    false /* alsoUseMoreRestrictiveLocales */, dictFile, "unused");
+            dict.waitAllTasksForTests();
+            assertFalse(dict.isInDictionary(STALE_WORD));
+        } finally {
+            dict.close();
+            dict.waitAllTasksForTests();
+            FileUtils.deleteRecursively(dictFile);
+        }
+    }
+
+    @Test
+    public void testContactsCopyIsRebuiltWhenLoaded() {
+        final Context context = getContext();
+        final File dictFile = new File(context.getCacheDir(),
+                TEST_DICT_NAME_PREFIX + "contacts.zz.dict");
+        FileUtils.deleteRecursively(dictFile);
+        // These are not closed: without READ_CONTACTS, which the keyboard need not have here,
+        // ContactsManager registers no observer and closing it fails. They have nothing to save.
+        try {
+            // As a contact name that was in the contacts when the copy was last written.
+            writeStaleWord(new NoContactsDictionary(context, dictFile), dictFile);
+            // As a start of the keyboard after the contact was deleted while it was not running.
+            final NoContactsDictionary dict = new NoContactsDictionary(context, dictFile);
+            dict.waitAllTasksForTests();
+            assertFalse(dict.isInDictionary(STALE_WORD));
+        } finally {
+            FileUtils.deleteRecursively(dictFile);
+        }
+    }
+
+    // A contacts dictionary as if there were no contacts.
+    private static final class NoContactsDictionary extends ContactsBinaryDictionary {
+        NoContactsDictionary(final Context context, final File dictFile) {
+            super(context, TEST_LOCALE, dictFile, "unused");
+        }
+
+        @Override
+        public void loadInitialContentsLocked() {
+            // No contacts are read.
+        }
+    }
+
+    // Adds STALE_WORD to the dictionary and writes the dictionary to its file.
+    private static void writeStaleWord(final ExpandableBinaryDictionary dict,
+            final File dictFile) {
+        dict.waitAllTasksForTests();
+        dict.addUnigramEntry(STALE_WORD, 250 /* frequency */, false /* isNotAWord */,
+                false /* isPossiblyOffensive */, BinaryDictionary.NOT_A_VALID_TIMESTAMP);
+        dict.asyncFlushBinaryDictionary();
+        dict.waitAllTasksForTests();
+        assertTrue(dict.isInDictionary(STALE_WORD));
+        assertTrue(dictFile.exists());
+    }
+
     private void closeAndDeleteTestDictionaries(final DictionaryFacilitatorImpl facilitator) {
         final ExpandableBinaryDictionary userDict =
                 facilitator.getSubDictForTesting(Dictionary.TYPE_USER);
