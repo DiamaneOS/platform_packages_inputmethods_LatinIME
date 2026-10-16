@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0
      Copyright 2026 The DiamaneOS Project -->
 <!-- Nothing is backed up or copied to a new device. android:allowBackup="false" covers this for
-     this system app; these rules repeat it for any path that reads data extraction rules
+     this system app. These rules repeat it for any path that reads data extraction rules
      instead (target SDK 31 or later). -->
 <data-extraction-rules>
     <cloud-backup>

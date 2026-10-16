@@ -59,10 +59,10 @@
 
     <!-- No backup or device-to-device transfer: the app data holds personal dictionaries, and a
          restore could plant dictionary files that the native code parses.
-         android:allowBackup="false" covers this for this system app; the data extraction rules
+         android:allowBackup="false" covers this for this system app. The data extraction rules
          repeat it for any path that reads them instead (target SDK 31 or later).
          Device-protected storage stays the default so that the keyboard works before the first
-         unlock; the personal dictionaries are kept in credential-protected storage instead
+         unlock. The personal dictionaries are kept in credential-protected storage instead
          (see PersonalDictionaryStorage). -->
     <application android:label="@string/english_ime_name"
          android:icon="@drawable/ic_launcher_keyboard"
