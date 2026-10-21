@@ -46,6 +46,12 @@ android_test {
 
     // Include all test java files.
     srcs: ["src/**/*.java"],
+    // These test the keyboard themes that were removed upstream in 2020.
+    exclude_srcs: [
+        "src/com/android/inputmethod/keyboard/KeyboardLayoutSetNavigateMoreKeysKlpTests.java",
+        "src/com/android/inputmethod/keyboard/KeyboardThemeTests.java",
+        "src/com/android/inputmethod/keyboard/action/Klp*.java",
+    ],
 
     instrumentation_for: "LatinIME",
 
